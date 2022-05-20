@@ -36,18 +36,21 @@ except ImportError:
     utc_tzinfo_factory = None
 from sqlalchemy import event
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.pool import manage
-
-# DATABASE_POOL_ARGS should be something like:
-# {'max_overflow':10, 'pool_size':5, 'recycle':300}
-pool_args = {'max_overflow': 10, 'pool_size': 5, 'recycle': 300}
-pool_args.update(getattr(settings, 'DATABASE_POOL_ARGS', {}))
-dialect = postgresql.dialect(dbapi=psycopg2)
-pool_args['dialect'] = dialect
+from sqlalchemy.pool import manage, QueuePool
 
 POOL_CLS = getattr(settings, 'DATABASE_POOL_CLASS', 'sqlalchemy.pool.QueuePool')
 pool_module_name, pool_cls_name = POOL_CLS.rsplit('.', 1)
 pool_cls = getattr(import_module(pool_module_name), pool_cls_name)
+
+# DATABASE_POOL_ARGS should be something like:
+# if pool class is QueuePool then
+#    {'max_overflow':10, 'pool_size':5, 'recycle':300}
+# otherwise
+#    {}
+pool_args = {'max_overflow': 10, 'pool_size': 5, 'recycle': 300} if isinstance(pool_cls, QueuePool) else {}
+pool_args.update(getattr(settings, 'DATABASE_POOL_ARGS', {}))
+dialect = postgresql.dialect(dbapi=psycopg2)
+pool_args['dialect'] = dialect
 pool_args['poolclass'] = pool_cls
 
 db_pool = manage(Database, **pool_args)
